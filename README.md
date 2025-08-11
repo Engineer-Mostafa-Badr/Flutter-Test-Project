@@ -1,16 +1,30 @@
-# flutter_text_project
+# مشروع تطبيق الأندرويد - تسجيل الدخول والربط مع Firebase
 
-A new Flutter project.
+## نظرة عامة  
+هذا التطبيق يوضح كيفية الربط مع Firebase لتنفيذ تسجيل دخول آمن باستخدام OTP (رمز التحقق المرسل على رقم الموبايل). التطبيق يحتوي على عدة مميزات تقنية تسهل تجربة المستخدم وتضمن أمان البيانات.
 
-## Getting Started
+## المميزات والتقنيات المستخدمة  
+- الربط مع **Firebase** لتخزين البيانات وإرسال الإشعارات.  
+- تسجيل دخول المستخدمين عن طريق إدخال البيانات الأساسية (الاسم، البريد الإلكتروني، ورقم الهاتف).  
+- إرسال **OTP** إلى رقم الهاتف لتأكيد إنشاء الحساب.  
+- صفحة **Home** رئيسية بعد تسجيل الدخول بنجاح.  
+- صفحة **Profile** تعرض بيانات المستخدم المخزنة، مع إمكانية تعديلها وحفظ التعديلات باستخدام **Shared Preferences**.  
+- استقبال **Push Notifications** من Firebase عند فتح التطبيق، والتي ترحب بالمستخدم باستخدام التوكن الخاص به من عملية تسجيل الدخول.
 
-This project is a starting point for a Flutter application.
+## طريقة الاختبار  
+لاختبار التطبيق، يمكنك استخدام البيانات التالية عند تسجيل الدخول:  
+- **رقم الهاتف:** +201004652998  
+- **رمز التحقق (OTP):** 000000  
+- يمكنك إدخال أي اسم وبريد إلكتروني.
 
-A few resources to get you started if this is your first Flutter project:
+## مشاهدة الفيديو  
+شاهد شرح تفصيلي للتطبيق وطريقة استخدامه من خلال الفيديو التالي:  
+[رابط فيديو المشروع على يوتيوب](https://youtu.be/MWHf6P7RW4g)
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## تحميل التطبيق  
+يمكنك تحميل ملف الـ APK من خلال الرابط التالي:  
+[تحميل APK التطبيق](https://drive.google.com/file/d/1C_aHqgRuZuGpYvXBktk50KUxfJLl6_Xr/view?usp=sharing)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+---
+
+إذا واجهت أي مشكلة أو لديك استفسار، لا تتردد في التواصل.
