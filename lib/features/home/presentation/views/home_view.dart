@@ -7,7 +7,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:responsive_sizer/responsive_sizer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// -------------------- Main Home View --------------------
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
 
@@ -17,45 +16,57 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   int _currentIndex = 0;
-  String _userName = "";
+  String _userName = "User";
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _initializeUser();
+  }
+
+  Future<void> _initializeUser() async {
+    await _loadUserData();
+    await _showWelcomeIfNeeded();
+    await _showLastFCMMessage();
   }
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    final name = prefs.getString('name') ?? "User";
+    final name = prefs.getString('name');
+    if (name != null && name.isNotEmpty) {
+      setState(() => _userName = name);
+    }
+  }
 
-    // عرض الرسالة الترحيبية مرة واحدة فقط
-    final shown = prefs.getBool('welcomeShown') ?? false;
-
-    setState(() {
-      _userName = name;
-    });
-
-    if (!shown) {
+  Future<void> _showWelcomeIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool welcomeShown = prefs.getBool('welcomeShown') ?? false;
+    if (!welcomeShown) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showWelcomeMessage(name);
+        _showSnackBar("مرحبًا بك, $_userName 👋");
       });
       await prefs.setBool('welcomeShown', true);
     }
   }
 
-  void _showWelcomeMessage(String name) {
+  Future<void> _showLastFCMMessage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? msg = prefs.getString("lastMessage");
+    if (msg != null && msg.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showSnackBar(msg);
+      });
+      await prefs.remove("lastMessage");
+    }
+  }
+
+  void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Welcome, $name 👋"),
-        duration: const Duration(seconds: 3),
-      ),
+      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
     );
   }
 
-  void _onNavTap(int index) {
-    setState(() => _currentIndex = index);
-  }
+  void _onNavTap(int index) => setState(() => _currentIndex = index);
 
   @override
   Widget build(BuildContext context) {
@@ -79,21 +90,19 @@ class _HomeViewState extends State<HomeView> {
       unselectedItemColor: Colors.grey,
       onTap: _onNavTap,
       items: [
-        _navItem(AppAssetsManager.home, "Home", 0),
-        _navItem(AppAssetsManager.name, "Favorites", 1),
-        _navItem(AppAssetsManager.name, "Profile", 2),
+        _buildNavItem(AppAssetsManager.home, "Home", 0),
+        _buildNavItem(AppAssetsManager.heart, "Favorites", 1),
+        _buildNavItem(AppAssetsManager.name, "Profile", 2),
       ],
     );
   }
 
-  BottomNavigationBarItem _navItem(String asset, String label, int index) {
+  BottomNavigationBarItem _buildNavItem(String asset, String label, int index) {
+    final color = _currentIndex == index
+        ? ColorManager.primaryColor
+        : Colors.grey;
     return BottomNavigationBarItem(
-      icon: SvgPicture.asset(
-        asset,
-        width: 24,
-        height: 24,
-        color: _currentIndex == index ? ColorManager.primaryColor : Colors.grey,
-      ),
+      icon: SvgPicture.asset(asset, width: 24, height: 24, color: color),
       label: label,
     );
   }

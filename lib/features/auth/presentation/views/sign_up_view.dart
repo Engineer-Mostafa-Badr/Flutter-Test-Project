@@ -14,81 +14,109 @@ class SignUpView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => RegisterCubit(),
+      create: (_) => RegisterCubit(),
       child: BlocBuilder<RegisterCubit, RegisterState>(
-        builder: (context, regState) {
-          final cubit = context.read<RegisterCubit>();
-          return Form(
-            key: regState.keyForm,
-            child: Scaffold(
-              backgroundColor: Colors.white,
-              body: SafeArea(
+        builder: (context, state) {
+          final cubit = context.watch<RegisterCubit>();
+
+          Widget buildTextField({
+            required String hintText,
+            required String labelText,
+            required TextEditingController controller,
+            required String? Function(String?) validate,
+            required String prefixIconPath,
+            required TextInputType keyboardType,
+            bool obscureText = false,
+          }) {
+            return RegisterTextFormField(
+              validate: validate,
+              controller: controller,
+              hintText: hintText,
+              labelText: labelText,
+              color: ColorManager.grey,
+              prefixIconPath: prefixIconPath,
+              keyboardType: keyboardType,
+            );
+          }
+
+          return Scaffold(
+            backgroundColor: Colors.white,
+            body: SafeArea(
+              child: Form(
+                key: state.keyForm,
                 child: ListView(
                   padding: EdgeInsets.symmetric(horizontal: 6.w),
                   children: [
                     SizedBox(height: 15.h),
-                    RegisterTextFormField(
-                      validate: (name) =>
-                          cubit.validateName(context: context, name: name),
-                      controller: regState.nameController,
+
+                    // Name
+                    buildTextField(
                       hintText: "Full Name",
                       labelText: "Full Name",
-                      color: ColorManager.grey,
+                      controller: state.nameController,
+                      validate: (name) =>
+                          cubit.validateName(context: context, name: name),
                       prefixIconPath: AppAssetsManager.name,
                       keyboardType: TextInputType.name,
                     ),
-                    RegisterTextFormField(
-                      validate: (email) =>
-                          cubit.validateEmail(context: context, email: email),
-                      controller: regState.emailController,
+
+                    // Email
+                    buildTextField(
                       hintText: "Email",
                       labelText: "Email",
-                      color: ColorManager.grey,
+                      controller: state.emailController,
+                      validate: (email) =>
+                          cubit.validateEmail(context: context, email: email),
                       prefixIconPath: AppAssetsManager.email,
                       keyboardType: TextInputType.emailAddress,
                     ),
-                    RegisterTextFormField(
-                      validate: (phone) =>
-                          cubit.validatePhone(context: context, phone: phone),
-                      controller: regState.phoneController,
+
+                    // Phone
+                    buildTextField(
                       hintText: "Phone Number",
                       labelText: "Phone Number",
-                      color: ColorManager.grey,
+                      controller: state.phoneController,
+                      validate: (phone) =>
+                          cubit.validatePhone(context: context, phone: phone),
                       prefixIconPath: AppAssetsManager.phone,
                       keyboardType: TextInputType.phone,
                     ),
-                    RegisterTextFormField(
+
+                    // Password
+                    buildTextField(
+                      hintText: "Password",
+                      labelText: "Password",
+                      controller: state.passwordController,
                       validate: (password) => cubit.validatePassword(
                         context: context,
                         password: password,
                       ),
-                      controller: regState.passwordController,
-                      hintText: "Password",
-                      labelText: "Password",
-                      color: ColorManager.grey,
                       prefixIconPath: AppAssetsManager.password,
                       keyboardType: TextInputType.visiblePassword,
+                      obscureText: !state.isShowPassword,
                     ),
+
                     SizedBox(height: 2.h),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            cubit.showHidePassword();
-                          },
-                          child: AppText(
-                            text: regState.isShowPassword
-                                ? "Show Password"
-                                : "Hide Password",
-                            textColor: ColorManager.black,
-                            fontSize: 14.px,
-                            fontWeight: FontWeight.w700,
-                          ),
+
+                    // Show/Hide Password Toggle
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: cubit.togglePasswordVisibility,
+                        child: AppText(
+                          text: state.isShowPassword
+                              ? "Hide Password"
+                              : "Show Password",
+                          textColor: ColorManager.black,
+                          fontSize: 14.px,
+                          fontWeight: FontWeight.w700,
                         ),
-                      ],
+                      ),
                     ),
+
                     SizedBox(height: 3.h),
+
+                    // Sign Up Button
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: ColorManager.primaryColor,
@@ -97,6 +125,19 @@ class SignUpView extends StatelessWidget {
                           borderRadius: BorderRadius.circular(4.w),
                         ),
                       ),
+                      onPressed: () {
+                        if (state.keyForm.currentState!.validate()) {
+                          Navigator.pushNamed(
+                            context,
+                            PageRouteName.enterOTP,
+                            arguments: {
+                              'name': state.nameController.text,
+                              'email': state.emailController.text,
+                              'phone': state.phoneController.text,
+                            },
+                          );
+                        }
+                      },
                       child: Text(
                         "Sign Up",
                         style: TextStyle(
@@ -105,20 +146,8 @@ class SignUpView extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      onPressed: () {
-                        if (regState.keyForm.currentState!.validate()) {
-                          Navigator.pushNamed(
-                            context,
-                            PageRouteName.enterOTP,
-                            arguments: {
-                              'name': regState.nameController.text,
-                              'email': regState.emailController.text,
-                              'phone': regState.phoneController.text,
-                            },
-                          );
-                        }
-                      },
                     ),
+
                     SizedBox(height: 3.h),
                   ],
                 ),

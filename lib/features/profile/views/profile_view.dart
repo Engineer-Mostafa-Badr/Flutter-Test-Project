@@ -14,23 +14,19 @@ class ProfileView extends StatefulWidget {
 }
 
 class _ProfileViewState extends State<ProfileView> {
-  // -------------------- Controllers --------------------
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
 
-  // -------------------- Original Values --------------------
   String _originalName = '';
   String _originalEmail = '';
   String _originalPhone = '';
   String _originalNationality = '';
 
-  // -------------------- Current State --------------------
   String _selectedNationality = '';
   bool _hasChanges = false;
   bool _isLoadingProfile = true;
 
-  // -------------------- Nationalities --------------------
   final List<String> _nationalities = [
     'Egyptian',
     'Saudi',
@@ -41,21 +37,19 @@ class _ProfileViewState extends State<ProfileView> {
     'Other',
   ];
 
-  // -------------------- Lifecycle --------------------
   @override
   void initState() {
     super.initState();
     _loadProfileData();
-    _setupListeners();
+    _addListeners();
   }
 
-  void _setupListeners() {
+  void _addListeners() {
     _nameController.addListener(_checkForChanges);
     _emailController.addListener(_checkForChanges);
     _phoneController.addListener(_checkForChanges);
   }
 
-  // -------------------- Data Methods --------------------
   Future<void> _loadProfileData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -89,7 +83,7 @@ class _ProfileViewState extends State<ProfileView> {
       _hasChanges = false;
     });
 
-    // ignore: use_build_context_synchronously
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Profile updated successfully')),
     );
@@ -103,54 +97,57 @@ class _ProfileViewState extends State<ProfileView> {
     Navigator.pushNamedAndRemoveUntil(
       context,
       PageRouteName.signUp,
-      (route) => false,
+      (_) => false,
     );
   }
 
-  // -------------------- Helpers --------------------
   void _checkForChanges() {
     if (_isLoadingProfile) return;
 
-    final hasChanged =
+    final changed =
         _nameController.text != _originalName ||
         _emailController.text != _originalEmail ||
         _phoneController.text != _originalPhone ||
         _selectedNationality != _originalNationality;
 
-    if (hasChanged != _hasChanges) {
-      setState(() => _hasChanges = hasChanged);
+    if (changed != _hasChanges) {
+      setState(() => _hasChanges = changed);
     }
   }
 
   void _showNationalityDialog() {
     showDialog(
       context: context,
-      builder: (context) {
-        return SimpleDialog(
-          title: const Text('Select Nationality'),
-          children: _nationalities.map((nation) {
-            return SimpleDialogOption(
-              onPressed: () {
-                setState(() {
-                  _selectedNationality = nation;
+      builder: (_) => SimpleDialog(
+        title: const Text('Select Nationality'),
+        children: _nationalities
+            .map(
+              (nation) => SimpleDialogOption(
+                onPressed: () {
+                  setState(() {
+                    _selectedNationality = nation;
+                  });
                   _checkForChanges();
-                });
-                Navigator.pop(context);
-              },
-              child: Text(nation),
-            );
-          }).toList(),
-        );
-      },
+                  Navigator.pop(context);
+                },
+                child: Text(nation),
+              ),
+            )
+            .toList(),
+      ),
     );
   }
 
-  // -------------------- UI Widgets --------------------
-  Widget _buildProfileField(String label, TextEditingController controller) {
+  Widget _buildProfileField({
+    required String label,
+    required TextEditingController controller,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 1.h),
       child: TextField(
         controller: controller,
+        keyboardType: keyboardType,
         decoration: InputDecoration(
           labelText: label,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(2.w)),
@@ -186,9 +183,9 @@ class _ProfileViewState extends State<ProfileView> {
 
   Widget _buildSaveButton() {
     return ElevatedButton(
-      onPressed: _saveProfileData,
+      onPressed: _hasChanges ? _saveProfileData : null,
       style: ElevatedButton.styleFrom(
-        backgroundColor: ColorManager.primaryColor,
+        backgroundColor: _hasChanges ? ColorManager.primaryColor : Colors.grey,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2.w)),
         minimumSize: Size(double.infinity, 6.h),
       ),
@@ -199,7 +196,6 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // -------------------- Build --------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -235,12 +231,23 @@ class _ProfileViewState extends State<ProfileView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildProfileField("Name", _nameController),
-                  _buildProfileField("Email", _emailController),
-                  _buildProfileField("Phone", _phoneController),
+                  _buildProfileField(
+                    label: "Name",
+                    controller: _nameController,
+                  ),
+                  _buildProfileField(
+                    label: "Email",
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  _buildProfileField(
+                    label: "Phone",
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                  ),
                   _buildNationalityField(),
                   SizedBox(height: 2.h),
-                  if (_hasChanges) _buildSaveButton(),
+                  _buildSaveButton(),
                 ],
               ),
             ),

@@ -32,14 +32,8 @@ class EnterOTPView extends StatefulWidget {
 class _EnterOTPViewState extends State<EnterOTPView> {
   static const int otpLength = 6;
 
-  final List<TextEditingController> _controllers = List.generate(
-    otpLength,
-    (_) => TextEditingController(),
-  );
-  final List<FocusNode> _focusNodes = List.generate(
-    otpLength,
-    (_) => FocusNode(),
-  );
+  late final List<TextEditingController> _controllers;
+  late final List<FocusNode> _focusNodes;
 
   bool _showSuccessBox = false;
   int _secondsRemaining = 30;
@@ -49,6 +43,10 @@ class _EnterOTPViewState extends State<EnterOTPView> {
   @override
   void initState() {
     super.initState();
+
+    _controllers = List.generate(otpLength, (_) => TextEditingController());
+    _focusNodes = List.generate(otpLength, (_) => FocusNode());
+
     _startCountdown();
     context.read<RegisterCubit>().sendPhoneOtp(widget.phone);
   }
@@ -56,44 +54,44 @@ class _EnterOTPViewState extends State<EnterOTPView> {
   @override
   void dispose() {
     _timer?.cancel();
-    for (var controller in _controllers) {
+    for (final controller in _controllers) {
       controller.dispose();
     }
-    for (var node in _focusNodes) {
+    for (final node in _focusNodes) {
       node.dispose();
     }
     super.dispose();
   }
 
-  // --------- OTP Logic ---------
   void _startCountdown() {
-    _secondsRemaining = 30;
-    _canResend = false;
+    setState(() {
+      _secondsRemaining = 30;
+      _canResend = false;
+    });
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        if (_secondsRemaining == 0) {
+      if (_secondsRemaining == 0) {
+        setState(() {
           _canResend = true;
-          timer.cancel();
-        } else {
+        });
+        timer.cancel();
+      } else {
+        setState(() {
           _secondsRemaining--;
-        }
-      });
+        });
+      }
     });
   }
 
   void _checkOTP() {
-    final allFilled = _controllers.every(
-      (controller) => controller.text.isNotEmpty,
-    );
-    if (!allFilled) return;
+    if (_controllers.any((controller) => controller.text.isEmpty)) return;
 
-    final code = _controllers.map((e) => e.text).join();
+    final code = _controllers.map((c) => c.text).join();
     context.read<RegisterCubit>().verifyOtpCode(code);
   }
 
   void _onResendOTP() {
-    for (var controller in _controllers) {
+    for (final controller in _controllers) {
       controller.clear();
     }
     _focusNodes.first.requestFocus();
@@ -117,141 +115,52 @@ class _EnterOTPViewState extends State<EnterOTPView> {
     );
   }
 
-  // --------- UI ---------
-  @override
-  Widget build(BuildContext context) {
-    return BlocConsumer<RegisterCubit, RegisterState>(
-      listener: (context, state) async {
-        if (state.isOtpVerified) {
-          FocusScope.of(context).unfocus();
-
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('isLoggedIn', true);
-          await prefs.setString('name', widget.name);
-          await prefs.setString('email', widget.email);
-          await prefs.setString('phone', widget.phone);
-
-          setState(() {
-            _showSuccessBox = true;
-          });
-        }
-
-        if (state.errorMessage != null) {
-          _showErrorDialog(state.errorMessage!);
-        }
-      },
-      builder: (context, state) {
-        return Scaffold(
-          backgroundColor: ColorManager.white,
-          resizeToAvoidBottomInset: false,
-          body: Stack(
-            children: [
-              _buildOTPForm(),
-              if (_showSuccessBox) _buildSuccessBox(),
-              if (state.isLoading)
-                const Center(
-                  child: CircularProgressIndicator(
-                    color: ColorManager.primaryColor,
-                  ),
-                ),
-            ],
+  Widget _buildOTPField(int index) {
+    return SizedBox(
+      width: 12.w,
+      height: 10.h,
+      child: TextField(
+        controller: _controllers[index],
+        focusNode: _focusNodes[index],
+        maxLength: 1,
+        textAlign: TextAlign.center,
+        keyboardType: TextInputType.number,
+        style: const TextStyle(fontSize: 24, color: ColorManager.primaryColor),
+        decoration: InputDecoration(
+          counterText: '',
+          filled: true,
+          fillColor: ColorManager.greyTextFormField,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(3.w),
+            borderSide: BorderSide.none,
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildOTPForm() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: 7.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(height: 5.h),
-          TextSpanManager(
-            textAlign: TextAlign.start,
-            textOne: "Enter the ",
-            fontSizeTextOne: 25.px,
-            fontWeightTextOne: FontWeight.w400,
-            colorTextOne: ColorManager.primaryColor,
-            latterSpaceTextOne: 0.5,
-            textTwo: "Verification Code",
-            fontSizeTextTwo: 25.px,
-            fontWeightTextTwo: FontWeight.w900,
-            colorTextTwo: ColorManager.black,
-            latterSpaceTextTwo: 0.5,
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(2.w),
+            borderSide: const BorderSide(color: ColorManager.black),
           ),
-          SizedBox(height: 3.h),
-          AppText(
-            textColor: ColorManager.black,
-            fontWeight: FontWeight.w600,
-            fontSize: 14.px,
-            text: "Enter the 6 digit code that we just sent to",
-          ),
-          AppText(
-            textColor: ColorManager.primaryColor,
-            fontWeight: FontWeight.w700,
-            fontSize: 16.px,
-            text: widget.phone,
-          ),
-          SizedBox(height: 12.h),
-          _buildOTPFields(),
-          SizedBox(height: 30.h),
-          _buildTimer(),
-          SizedBox(height: 3.h),
-          _buildResendText(),
-        ],
+        ),
+        onChanged: (value) {
+          if (value.isNotEmpty && index < otpLength - 1) {
+            _focusNodes[index + 1].requestFocus();
+          } else if (value.isEmpty && index > 0) {
+            _focusNodes[index - 1].requestFocus();
+          }
+          if (index == otpLength - 1 && value.isNotEmpty) {
+            _checkOTP();
+          }
+        },
       ),
     );
   }
 
-  Widget _buildOTPFields() {
+  Widget _buildOTPFieldsRow() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: List.generate(otpLength, (index) {
-        return SizedBox(
-          width: 12.w,
-          height: 10.h,
-          child: TextField(
-            controller: _controllers[index],
-            focusNode: _focusNodes[index],
-            maxLength: 1,
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            style: const TextStyle(
-              fontSize: 24,
-              color: ColorManager.primaryColor,
-            ),
-            decoration: InputDecoration(
-              counterText: '',
-              filled: true,
-              fillColor: ColorManager.greyTextFormField,
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(3.w),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(2.w),
-                borderSide: const BorderSide(color: ColorManager.black),
-              ),
-            ),
-            onChanged: (value) {
-              if (value.isNotEmpty && index < otpLength - 1) {
-                _focusNodes[index + 1].requestFocus();
-              } else if (value.isEmpty && index > 0) {
-                _focusNodes[index - 1].requestFocus();
-              }
-              if (index == otpLength - 1 && value.isNotEmpty) {
-                _checkOTP();
-              }
-            },
-          ),
-        );
-      }),
+      children: List.generate(otpLength, _buildOTPField),
     );
   }
 
-  Widget _buildTimer() {
+  Widget _buildTimerWidget() {
     return Center(
       child: ClipRRect(
         borderRadius: BorderRadius.circular(7.w),
@@ -285,7 +194,7 @@ class _EnterOTPViewState extends State<EnterOTPView> {
     );
   }
 
-  Widget _buildResendText() {
+  Widget _buildResendTextWidget() {
     return Center(
       child: GestureDetector(
         onTap: _canResend ? _onResendOTP : null,
@@ -388,6 +297,91 @@ class _EnterOTPViewState extends State<EnterOTPView> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildOTPForm() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(horizontal: 7.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: 5.h),
+          TextSpanManager(
+            textAlign: TextAlign.start,
+            textOne: "Enter the ",
+            fontSizeTextOne: 25.px,
+            fontWeightTextOne: FontWeight.w400,
+            colorTextOne: ColorManager.primaryColor,
+            latterSpaceTextOne: 0.5,
+            textTwo: "Verification Code",
+            fontSizeTextTwo: 25.px,
+            fontWeightTextTwo: FontWeight.w900,
+            colorTextTwo: ColorManager.black,
+            latterSpaceTextTwo: 0.5,
+          ),
+          SizedBox(height: 3.h),
+          AppText(
+            textColor: ColorManager.black,
+            fontWeight: FontWeight.w600,
+            fontSize: 14.px,
+            text: "Enter the 6 digit code that we just sent to",
+          ),
+          AppText(
+            textColor: ColorManager.primaryColor,
+            fontWeight: FontWeight.w700,
+            fontSize: 16.px,
+            text: widget.phone,
+          ),
+          SizedBox(height: 12.h),
+          _buildOTPFieldsRow(),
+          SizedBox(height: 30.h),
+          _buildTimerWidget(),
+          SizedBox(height: 3.h),
+          _buildResendTextWidget(),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<RegisterCubit, RegisterState>(
+      listener: (context, state) async {
+        if (state.isOtpVerified) {
+          FocusScope.of(context).unfocus();
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('isLoggedIn', true);
+          await prefs.setString('name', widget.name);
+          await prefs.setString('email', widget.email);
+          await prefs.setString('phone', widget.phone);
+
+          setState(() => _showSuccessBox = true);
+        }
+
+        if (state.errorMessage != null) {
+          _showErrorDialog(state.errorMessage!);
+        }
+      },
+      builder: (context, state) {
+        return Scaffold(
+          backgroundColor: ColorManager.white,
+          resizeToAvoidBottomInset: false,
+          body: Stack(
+            children: [
+              _buildOTPForm(),
+              if (_showSuccessBox) _buildSuccessBox(),
+              if (state.isLoading)
+                const Center(
+                  child: CircularProgressIndicator(
+                    color: ColorManager.primaryColor,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

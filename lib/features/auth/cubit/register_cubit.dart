@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
+
 part 'register_state.dart';
 
 class RegisterCubit extends Cubit<RegisterState> with Validate {
@@ -19,45 +20,27 @@ class RegisterCubit extends Cubit<RegisterState> with Validate {
         ),
       );
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
-  /// إظهار / إخفاء الباسورد
-  void showHidePassword() {
+  /// يعكس حالة إظهار/إخفاء كلمة المرور
+  void togglePasswordVisibility() {
     emit(state.copyWith(isShowPassword: !state.isShowPassword));
   }
 
-  /// إرسال كود OTP عبر Firebase
-  void sendPhoneOtp(String phone) async {
+  /// يرسل رمز التحقق OTP إلى رقم الهاتف عبر Firebase
+  Future<void> sendPhoneOtp(String phoneNumber) async {
     emit(state.copyWith(isLoading: true, errorMessage: null));
 
     try {
-      await _auth.verifyPhoneNumber(
-        phoneNumber: phone,
+      await _firebaseAuth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
         timeout: const Duration(seconds: 60),
         verificationCompleted: (PhoneAuthCredential credential) async {
-          final userCredential = await _auth.signInWithCredential(credential);
-          bool isNewUser =
-              userCredential.additionalUserInfo?.isNewUser ?? false;
-
-          // حفظ البيانات محليًا
-          await _saveUserLocally(userCredential.user!, isNewUser);
-
-          emit(
-            state.copyWith(
-              isOtpVerified: true,
-              isLoading: false,
-              isNewUser: isNewUser,
-            ),
-          );
+          await _signInWithCredential(credential);
         },
         verificationFailed: (FirebaseAuthException e) {
-          String message;
-          if (e.code == 'invalid-phone-number') {
-            message = "رقم الهاتف غير صالح";
-          } else {
-            message = e.message ?? "فشل التحقق من رقم الهاتف";
-          }
-          emit(state.copyWith(isLoading: false, errorMessage: message));
+          final errorMsg = _mapFirebaseAuthErrorToMessage(e);
+          emit(state.copyWith(isLoading: false, errorMessage: errorMsg));
         },
         codeSent: (String verificationId, int? resendToken) {
           emit(
@@ -73,7 +56,7 @@ class RegisterCubit extends Cubit<RegisterState> with Validate {
           emit(state.copyWith(verificationId: verificationId));
         },
       );
-    } catch (e) {
+    } catch (_) {
       emit(
         state.copyWith(
           isLoading: false,
@@ -83,8 +66,8 @@ class RegisterCubit extends Cubit<RegisterState> with Validate {
     }
   }
 
-  /// التحقق من كود OTP
-  void verifyOtpCode(String smsCode) async {
+  /// يتحقق من كود OTP المُدخل ويرسل بيانات الدخول
+  Future<void> verifyOtpCode(String smsCode) async {
     if (state.verificationId == null) {
       emit(state.copyWith(errorMessage: "لم يتم إرسال رمز التحقق بعد"));
       return;
@@ -97,48 +80,59 @@ class RegisterCubit extends Cubit<RegisterState> with Validate {
         verificationId: state.verificationId!,
         smsCode: smsCode,
       );
-
-      final userCredential = await _auth.signInWithCredential(credential);
-      bool isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
-
-      // حفظ البيانات محليًا
-      await _saveUserLocally(userCredential.user!, isNewUser);
-
-      emit(
-        state.copyWith(
-          isOtpVerified: true,
-          isLoading: false,
-          isNewUser: isNewUser,
-        ),
-      );
+      await _signInWithCredential(credential);
     } on FirebaseAuthException catch (e) {
-      String message;
-      if (e.code == 'invalid-verification-code') {
-        message = "رمز التحقق غير صحيح";
-      } else {
-        message = e.message ?? "رمز التحقق غير صحيح";
-      }
-      emit(state.copyWith(isLoading: false, errorMessage: message));
-    } catch (e) {
+      final errorMsg = _mapFirebaseAuthErrorToMessage(e);
+      emit(state.copyWith(isLoading: false, errorMessage: errorMsg));
+    } catch (_) {
       emit(
         state.copyWith(isLoading: false, errorMessage: "رمز التحقق غير صحيح"),
       );
     }
   }
 
-  /// حفظ بيانات المستخدم محليًا + حفظ التوكن
+  /// يعالج تسجيل الدخول باستخدام بيانات الاعتماد ويخزن بيانات المستخدم محليًا
+  Future<void> _signInWithCredential(PhoneAuthCredential credential) async {
+    final userCredential = await _firebaseAuth.signInWithCredential(credential);
+    final isNewUser = userCredential.additionalUserInfo?.isNewUser ?? false;
+
+    await _saveUserLocally(userCredential.user!, isNewUser);
+
+    emit(
+      state.copyWith(
+        isOtpVerified: true,
+        isLoading: false,
+        isNewUser: isNewUser,
+      ),
+    );
+  }
+
+  /// يحفظ بيانات المستخدم محليًا مع حفظ FCM Token
   Future<void> _saveUserLocally(User user, bool isNewUser) async {
     final prefs = await SharedPreferences.getInstance();
+
     await prefs.setString('uid', user.uid);
     await prefs.setString('phoneNumber', user.phoneNumber ?? '');
     await prefs.setBool('isNewUser', isNewUser);
-    // الحصول على الـ FCM Token وحفظه
-    String? token = await FirebaseMessaging.instance.getToken();
-    if (token != null) {
-      await prefs.setString('fcmToken', token);
-      debugPrint("🎯 FCM Token generated and saved: $token");
+
+    final fcmToken = await FirebaseMessaging.instance.getToken();
+    if (fcmToken != null) {
+      await prefs.setString('fcmToken', fcmToken);
+      debugPrint("🎯 FCM Token generated and saved: $fcmToken");
     } else {
       debugPrint("⚠️ FCM Token is null, couldn't save it.");
+    }
+  }
+
+  /// يحول أخطاء FirebaseAuth إلى رسائل مفهومة للمستخدم
+  String _mapFirebaseAuthErrorToMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-phone-number':
+        return "رقم الهاتف غير صالح";
+      case 'invalid-verification-code':
+        return "رمز التحقق غير صحيح";
+      default:
+        return e.message ?? "حدث خطأ أثناء التحقق";
     }
   }
 }
